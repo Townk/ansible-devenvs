@@ -1,0 +1,157 @@
+# MIT License
+#
+# Copyright (c) 2019 Thiago Alves
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+---
+########################################################################
+# Install with Homebrew on macOS
+- name: "Install {{ env.name }} with Homebrew"
+  include_tasks: install-homebrew.yaml
+  when: env.install.type == "system" and (ansible_distribution == "MacOSX" or ansible_distribution == "macOS")
+
+########################################################################
+# Install normally on host
+- name: "Install {{ env.name }} manually"
+  include_tasks: install-standard.yaml
+  when: not (ansible_distribution == "MacOSX" and ansible_distribution == "macOS")
+
+########################################################################
+# Install requested versions
+- name: "Install {{ env.type }} versions"
+  block:
+    - name: "Find all versions of {{ env.type }} that are not needed anymore"
+      find:
+        paths: "{{ env.install.datapath }}/{{ env.name | lower }}/versions"
+        follow: yes
+        file_type: directory
+      register: _env_to_remove
+      changed_when: False
+
+    - name: "Normalize list of not needed versions of {{ env.type }}"
+      set_fact:
+        _env_to_remove: "{{ _env_to_remove.files|map(attribute='path')|map('basename')|difference(env.versions.install)|list }}"
+
+    - name: "Install {{ env.type }} versions"
+      include_tasks: install-version.yaml
+      loop: "{{ env.versions.install }}"
+      loop_control:
+        loop_var: version
+
+    - name: "Uninstall not needed {{ env.type }} versions"
+      include_tasks: uninstall-version.yaml
+      loop: "{{ _env_to_remove }}"
+      loop_control:
+        loop_var: version
+  when: env.versions.install is defined
+
+########################################################################
+# Install versions that cannot be installed normally (e.g. jEnv versions)
+- name: "Add {{ env.name }} system versions"
+  block:
+    - name: "Get a list of installed {{ env.type }} versions"
+      find:
+        paths: "{{ env.install.datapath }}/{{ env.name | lower }}/versions"
+        follow:
+        file_type: link
+      register: _env_installed_versions
+      changed_when: False
+
+    - name: "Get information from symbolic link of {{ env.typr }} version on {{ env.name }}"
+      stat:
+        path: "{{ item }}"
+      register: _env_installed_versions
+      loop: "{{ _env_installed_versions.files|map(attribute='path')|list }}"
+      changed_when: False
+
+    - name: "Aggregate {{ env.type }} version by its location on host"
+      set_fact:
+        _env_version_links: "{{ _env_version_links|default({})|combine({item.stat.lnk_target: _env_version_links[item.stat.lnk_target]|default([]) + [item.stat.path|basename]}, recursive=true) }}"
+      loop: "{{ _env_installed_versions.results }}"
+      loop_control:
+        label: "{{ item.stat.path|basename }} -> {{ item.stat.lnk_target }}"
+
+    - name: "Cache {{ env.type }} location on host"
+      set_fact:
+        _env: "{{ _env | combine(new_value, recursive=true) }}"
+      vars:
+        new_value:
+          version:
+            allinstalled: "{{ _env_version_links }}"
+
+    - name: "Normalize {{ env.type }} list of versions to add"
+      set_fact:
+        _env: "{{ _env | combine(new_value, recursive=true) }}"
+      vars:
+        new_value:
+          version:
+            toinstall: "{{ env.versions.add|difference(_env.version.allinstalled)|list }}"
+
+    - name: "Get list of {{ env.type }}s to remove from {{ env.name }}"
+      set_fact:
+        _env_to_remove: "{{ _env_version_links|dict2items|selectattr('key', 'in', _env_version_links.keys() | difference(env.versions.add))|list|items2dict }}"
+
+    - name: "Normalize list of {{ env.type }}s to remove from {{ env.name }}"
+      set_fact:
+        _env: "{{ _env | combine(new_value, recursive=true) }}"
+      vars:
+        new_value:
+          version:
+            toremove: "{{ _env_to_remove.values()|flatten }}"
+
+    - name: "Add {{ env.type }} versions"
+      include_tasks: add-version.yaml
+      loop: "{{ _env.version.toinstall }}"
+      loop_control:
+        loop_var: version
+
+    - name: "Remove unused {{ env.type }} versions"
+      include_tasks: remove-version.yaml
+      loop: "{{ _env.version.toremove }}"
+      loop_control:
+        loop_var: version
+  when: env.versions.add
+
+########################################################################
+# Define default packages
+- name: Install default packages
+  block:
+    - name: "Define default {{ env.type }} packages to be installed on each {{ env.name }} version" 
+      template:
+        src: default-packages.j2
+        dest: "{{ env.install.datapath }}/{{ env.name | lower }}/default-packages"
+
+    - name: "Update default packages on existent {{ env.name }} versions"      
+      include_tasks: update-default-pkgs.yaml
+      loop: "{{ env.versions.install }}"
+      loop_control:
+        loop_var: version
+  when: env.default_packages
+
+########################################################################
+# Set default version
+- name: "Get {{ env.type }} version used by {{ env.name }}"
+  raw: "{{ _env.cmd }} version"
+  register: _env_current_version
+  changed_when: False
+  ignore_errors: true
+
+- name: "Set the default version of {{ env.type }} to {{ env.default_version }} on {{ env.name }}"
+  raw: "{{ env.name | upper }}_ROOT='{{ env.install.datapath }}/{{ env.name | lower }}' {{ env.install.path }}/bin/{{ env.name | lower }} global {{ env.default_version }}"
+  when: env.default_version is defined and (_env_current_version.rc != 0 or _env_current_version.stdout.split()|first != env.default_version)

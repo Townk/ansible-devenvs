@@ -1,0 +1,206 @@
+# MIT License
+#
+# Copyright (c) 2019 Thiago Alves
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+---
+- include_tasks: install-check.yaml
+
+########################################################################
+# Prepare base install
+- name: "Prepare directories for {{ env.name }} installation"
+  block:
+    - name: "Create {{ env.name }} installation directory"
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ env.install.path }}"
+        - "{{ env.install.datapath }}/zsh/plugins"
+
+    - name: "Create temp location for {{ env.name }} installation files"
+      tempfile:
+        state: directory
+        prefix: "ansible/{{ env.name | lower }}-install-"
+      register: _env_tmpdir
+      changed_when: False
+
+    - name: Cache temp dir location
+      set_fact:
+        _env: "{{ _env | combine(new_value, recursive=true) }}"
+      vars:
+        new_value:
+          tmpdir: "{{ _env_tmpdir.path }}"
+      changed_when: False
+
+########################################################################
+# Get latest code
+- name: "Get latest version of {{ env.name }} on GitHub"
+  block:
+    - name: "Get {{ env.name }} latest release info from GitHub"
+      uri:
+        url: "https://api.github.com/repos/{{ env.repo }}/releases/latest"
+        headers:
+          Accept: application/vnd.github.v3+json
+          User-Agent: Ansible-provision-playbook
+          Authorization: token 0694be7df5cef4931b73170f7f5f69a551577c24
+        return_content: yes
+      register: _env_latest_version
+      ignore_errors: yes
+
+    - name: "Get tag and version from {{ env.name }} GitHub info"
+      set_fact:
+        _env: "{{ _env | combine(new_value, recursive=true) }}"
+      vars:
+        new_value:
+          version:
+            latesttag: "{{ _env_latest_version.json.tag_name }}"
+            latest: "{{ _env_latest_version.json.tag_name[1:] if _env_latest_version.json.tag_name[0] == 'v' else _env_latest_version.json.tag_name }}"
+      when: _env_latest_version.status >= 200 and _env_latest_version.status < 300
+
+    - name: "Fallback to get GitHub information on {{ env.name }} from tags"
+      block:
+        - name: "Get {{ env.name }} latest release tags from GitHub"
+          uri:
+            url: "https://api.github.com/repos/{{ env.repo }}/tags"
+            headers:
+              Accept: application/vnd.github.v3+json
+              User-Agent: Ansible-provision-playbook
+              Authorization: token 0694be7df5cef4931b73170f7f5f69a551577c24
+            return_content: yes
+          register: _env_all_tags
+
+        - name: "Get tag and version from {{ env.name }} GitHub info"
+          set_fact:
+            _env: "{{ _env | combine(new_value, recursive=true) }}"
+          vars:
+            new_value:
+              version:
+                latesttag: "{{ _env_all_tags.json[0].name }}"
+                latest: "{{ _env_all_tags.json[0].name }}"
+      when: _env_latest_version.status < 200 or _env_latest_version.status >= 300
+
+    - name: "Download latest version of {{ env.name }}"
+      git:
+        repo: "https://github.com/{{ env.repo }}.git"
+        dest: "{{ _env.tmpdir }}"
+        version: "{{ _env.version.latesttag }}"
+        accept_hostkey: yes
+      changed_when: False
+
+- name: "Install {{ env.name }}"
+  block:
+    ########################################################################
+    # Retrieve {{ env.name }} version information
+    - name: "Get installed {{ env.name }} info"
+      block:
+        - name: "Get installed version of {{ env.name }}"
+          shell: "{{ _env.cmd }} --version"
+          register: _env_current_version
+          changed_when: False
+
+        - name: "Normalize installed version of {{ env.name }}"
+          set_fact:
+            _env: "{{ _env | combine(new_value, recursive=true) }}"
+          vars:
+            new_value:
+              version:
+                current: "{{ _env_current_version.stdout.split()[1] }}"
+      when: _env.installed
+
+    - name: Perform installation if we need to
+      block:
+        ########################################################################
+        # Build shell extensions
+        - name: "Build {{ env.name }} resources"
+          block:
+            - name: "Check if we need to compile shell extensions for {{ env.name }}"
+              stat:
+                path: "{{ _env.tmpdir }}/src"
+              ignore_errors: true
+              register: _env_shellext
+
+            - name: "Compile dynamic bash extension to speed up {{ env.name }}"
+              raw: "SDKROOT='{{ macOS_SDK_ROOT }}' {{ _env.tmpdir }}/src/configure && SDKROOT='{{ macOS_SDK_ROOT }}' make -C {{ _env.tmpdir }}/src"
+              ignore_errors: true
+              when: _env_shellext.stat.exists and macOS_SDK_ROOT is defined
+
+            - name: "Compile dynamic bash extension to speed up {{ env.name }}"
+              raw: "{{ _env.tmpdir }}/src/configure && make -C {{ _env.tmpdir }}/src"
+              ignore_errors: true
+              when: _env_shellext.stat.exists and macOS_SDK_ROOT is not defined
+
+        ########################################################################
+        # Install base files
+        - name: "Install {{ env.name }} on {{ env.install.path }}"
+          copy:
+            src: "{{ _env.tmpdir }}/{{ item }}"
+            dest: "{{ env.install.path }}/"
+            remote_src: yes
+            force: "{{ env.install.force | bool }}"
+          loop: "{{ env.install.corefiles }}"
+      when: env.install.force or not _env.installed or _env.version.latest is version(_env.version.current, ">")
+  when: env.install.force or not _env.installed
+
+########################################################################
+# Install shell plugins
+- name: "Install {{ env.name }} shell plugin into {{ env.install.datapath }}/zsh/plugins"
+  template:
+    src: plugin.zsh.j2
+    dest: "{{ env.install.datapath }}/zsh/plugins/{{ env.name | lower }}.plugin.zsh"
+  vars:
+    env_completion_plugin_file: "{{ lookup('file', '%s/completions/%s.zsh' % (_env.tmpdir, env.name|lower)) }}"
+
+########################################################################
+# Install env plugins
+- name: "Install plugins"
+  block:
+    - name: "Find all installed plugins for {{ env.name }}"
+      find:
+        paths: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins"
+        follow: yes
+        file_type: directory
+      register: _env_installed_plugins
+      changed_when: False
+
+    - name: "Normalize list of installed plugins for {{ env.name }}"
+      set_fact:
+        _env_installed_plugins: "{{ _env_installed_plugins.files|map(attribute='path')|map('basename')|list }}"
+
+    - name: "Install {{ env.name }} plugins"
+      include_tasks: install-plugin.yaml
+      loop: "{{ env.plugins|rejectattr('name', 'in', _env_installed_plugins)|list }}"
+      loop_control:
+        loop_var: plugin
+
+    - name: "Remove {{ env.name }} plugins not needed anymore"
+      file:
+        path: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins/{{ item }}"
+        state: absent
+      loop: "{{ _env_installed_plugins|difference(env.plugins|map(attribute='name')|list) }}"
+  when: env.plugins
+
+########################################################################
+# Finish installation
+- name: Clean up temp files
+  file:
+    path: "{{ _env.tmpdir }}"
+    state: absent
+  when: _env.tmpdir is defined
+  changed_when: False

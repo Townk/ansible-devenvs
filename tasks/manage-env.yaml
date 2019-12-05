@@ -1,0 +1,87 @@
+# MIT License
+#
+# Copyright (c) 2019 Thiago Alves
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+---
+- name: "Prepare initial facts for {{ env_defaults.name }}"
+  set_fact:
+    _env_current_version: ""
+    _env_installed_versions: []
+    _env_version_links: {}
+    _env_to_remove: []
+    _env:
+      installed: no
+      cmd: ""
+      version:
+        current: ""
+        latest: ""
+        latesttag: ""
+        allinstalled: []
+        toinstall: []
+        toremove: []
+      tmpdir: ""
+    env: "{{ env_defaults | combine(env_item, recursive=true) }}"    
+  vars:
+    env_defaults:
+      name: ""
+      type: ""
+      repo: ""
+      state: present
+      install:
+        type: local
+        force: no
+        path: ""
+        datapath: ""
+        corefiles: []
+      plugins: []
+      shell:
+        pre-init_hook: ""
+        post_init_hook: ""
+      versions:
+        install: []
+        add: []
+      default_version: ""
+      default_packages: []
+
+- name: "Define {{ env.name }} installation dir"
+  set_fact:
+    env: "{{ env | combine(new_value, recursive=true) }}"
+  vars:
+    new_value:
+      install:
+        path: "{{ '/usr/local/%s' % (env.name|lower) if env.install.type == 'system' else '%s/%s' % (lookup('env', 'XDG_OPT_HOME'), env.name|lower) if lookup('env', 'XDG_OPT_HOME') else '%s/.%s' % (lookup('env', 'HOME'), env.name|lower) }}"
+  when: env.install.path is not defined or not env.install.path
+
+- name: "Define {{ env.name }} data dir"
+  set_fact:
+    env: "{{ env | combine(new_value, recursive=true) }}"
+  vars:
+    new_value:
+      install:
+        datapath: "{{ lookup('env', 'XDG_DATA_HOME') if lookup('env', 'XDG_DATA_HOME') else '%s/.%s/share' % (lookup('env', 'HOME'), env.name|lower) }}"
+  when: env.install.datapath is not defined or not env.install.datapath
+
+- name: "Install {{ env.name }}"
+  include_tasks: "install.yaml"
+  when: env.state == "present"
+
+- name: "Remove {{ env.name }}"
+  include_tasks: "remove.yaml"
+  when: env.state == "absent"
