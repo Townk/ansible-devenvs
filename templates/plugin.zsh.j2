@@ -60,10 +60,12 @@ eval "$({{ env.name | lower }} init -)"
 {{ env.shell.post_init_hook }}
 {% endif %}
 
+{% if env_completion_plugin_file is defined and env_completion_plugin_file %}
 ##########################################
-# Start of fzf default completion plugin
+# Start of env default completion plugin
 
 {{ env_completion_plugin_file }}
 
 # End of fzf default completion plugin
 ##########################################
+{% endif %}

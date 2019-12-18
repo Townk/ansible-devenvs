@@ -59,7 +59,7 @@
         headers:
           Accept: application/vnd.github.v3+json
           User-Agent: Ansible-provision-playbook
-          Authorization: token 0694be7df5cef4931b73170f7f5f69a551577c24
+          Authorization: "token {{ github_auth_token }}"
         return_content: yes
       register: _env_latest_version
       ignore_errors: yes
@@ -82,7 +82,7 @@
             headers:
               Accept: application/vnd.github.v3+json
               User-Agent: Ansible-provision-playbook
-              Authorization: token 0694be7df5cef4931b73170f7f5f69a551577c24
+              Authorization: "token {{ github_auth_token }}"
             return_content: yes
           register: _env_all_tags
 
