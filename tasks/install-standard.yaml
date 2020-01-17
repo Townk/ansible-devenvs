@@ -33,11 +33,13 @@
       loop:
         - "{{ env.install.path }}"
         - "{{ env.install.datapath }}/zsh/plugins"
+        - "{{ lookup('env', 'TMPDIR') }}/ansible"
 
     - name: "Create temp location for {{ env.name }} installation files"
       tempfile:
         state: directory
-        prefix: "ansible/{{ env.name | lower }}-install-"
+        path: "{{ lookup('env', 'TMPDIR') }}/ansible"
+        prefix: "{{ env.name | lower }}-install-"
       register: _env_tmpdir
       changed_when: False
 
