@@ -22,7 +22,7 @@
 ---
 - name: "Remove {{ env.name }} shell plugin"
   file:
-    path: "{{ env.install.datapath }}/zsh/plugins/{{ env.name | lower }}.plugin.zsh"
+    path: "{{ env.install.shpluginpath }}/{{ env.name | lower }}.plugin.zsh"
     state: absent
 
 - name: "Remove installed {{ env.name }} base files"
@@ -32,5 +32,5 @@
 
 - name: "Remove installed {{ env.name }} data files"
   file:
-    path: "{{ env.install.datapath }}/{{ env.name | lower }}"
+    path: "{{ env.install.datapath }}"
     state: absent

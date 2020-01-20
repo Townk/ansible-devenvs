@@ -22,5 +22,5 @@
 ---
 
 - name: "Add {{ env.type }} from {{ version }}"
-  raw: "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/ {{ env.name | upper }}_ROOT='{{ env.install.datapath }}/{{ env.name | lower }}' {{ _env.cmd }} add {{ version }}"
+  raw: "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/ {{ env.name | upper }}_ROOT='{{ env.install.datapath }}' {{ _env.cmd }} add {{ version }}"
   notify: Rehash installed versions

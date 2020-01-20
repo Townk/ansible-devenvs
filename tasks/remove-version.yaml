@@ -22,10 +22,10 @@
 ---
 - name: "Check for {{ env.type }} version {{ version }}"
   stat:
-    path: "{{ env.install.datapath }}/{{ env.name | lower }}/versions/{{ version }}"
+    path: "{{ env.install.datapath }}/versions/{{ version }}"
   register: env_version
   ignore_errors: yes
 
 - name: "Remove {{ env.type }} version {{ version }} from {{ env.name }}"
-  raw: "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/ {{ env.name | upper }}_ROOT='{{ env.install.datapath }}/{{ env.name | lower }}' {{ env.install.path }}/bin/{{ env.name | lower }} remove {{ version }}"
+  raw: "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/ {{ env.name | upper }}_ROOT='{{ env.install.datapath }}' {{ env.install.path }}/bin/{{ env.name | lower }} remove {{ version }}"
   when: env_version.stat.exists

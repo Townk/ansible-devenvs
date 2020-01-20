@@ -31,8 +31,8 @@
         path: "{{ item }}"
         state: directory
       loop:
-        - "{{ env.install.path }}"
-        - "{{ env.install.datapath }}/zsh/plugins"
+        - "{{ env.install.path }}/versions"
+        - "{{ env.install.shpluginpath }}"
         - "{{ lookup('env', 'TMPDIR') }}/ansible"
 
     - name: "Create temp location for {{ env.name }} installation files"
@@ -162,10 +162,10 @@
 
 ########################################################################
 # Install shell plugins
-- name: "Install {{ env.name }} shell plugin into {{ env.install.datapath }}/zsh/plugins"
+- name: "Install {{ env.name }} shell plugin into {{ env.install.shpluginpath }}"
   template:
     src: plugin.zsh.j2
-    dest: "{{ env.install.datapath }}/zsh/plugins/{{ env.name | lower }}.plugin.zsh"
+    dest: "{{ env.install.shpluginpath }}/{{ env.name | lower }}.plugin.zsh"
   vars:
     env_completion_plugin_file: "{{ lookup('file', '%s/completions/%s.zsh' % (_env.tmpdir, env.name|lower)) }}"
 
@@ -175,7 +175,7 @@
   block:
     - name: "Find all installed plugins for {{ env.name }}"
       find:
-        paths: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins"
+        paths: "{{ env.install.datapath }}/plugins"
         follow: yes
         file_type: directory
       register: _env_installed_plugins
@@ -193,7 +193,7 @@
 
     - name: "Remove {{ env.name }} plugins not needed anymore"
       file:
-        path: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins/{{ item }}"
+        path: "{{ env.install.datapath }}/plugins/{{ item }}"
         state: absent
       loop: "{{ _env_installed_plugins|difference(env.plugins|map(attribute='name')|list) }}"
   when: env.plugins

@@ -49,6 +49,7 @@
         force: no
         path: ""
         datapath: ""
+        shpluginpath: ""
         corefiles: []
       plugins: []
       shell:
@@ -75,8 +76,17 @@
   vars:
     new_value:
       install:
-        datapath: "{{ lookup('env', 'XDG_DATA_HOME') if lookup('env', 'XDG_DATA_HOME') else '%s/.%s/share' % (lookup('env', 'HOME'), env.name|lower) }}"
+        datapath: "{{ '%s/%s' % (lookup('env', 'XDG_DATA_HOME'), env.name|lower) if lookup('env', 'XDG_DATA_HOME') else '%s/.%s' % (lookup('env', 'HOME'), env.name|lower) }}"
   when: env.install.datapath is not defined or not env.install.datapath
+
+- name: "Define {{ env.name }} shell plugins dir"
+  set_fact:
+    env: "{{ env | combine(new_value, recursive=true) }}"
+  vars:
+    new_value:
+      install:
+        shpluginpath: "{{ '%s/zsh/plugins' % lookup('env', 'XDG_DATA_HOME') if lookup('env', 'XDG_DATA_HOME') else '%s/.zsh/plugins' % lookup('env', 'HOME') }}"
+  when: env.install.shpluginpath is not defined or not env.install.shpluginpath
 
 - name: "Install {{ env.name }}"
   include_tasks: "install.yaml"

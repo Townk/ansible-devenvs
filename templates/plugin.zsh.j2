@@ -51,7 +51,7 @@ if [ -z $SDKROOT ]; then
     export SDKROOT=${SDKROOT:-{{ macOS_SDK_ROOT if macOS_SDK_ROOT is defined else "" }}}
 fi
 {% endif %}
-export {{ env.name | upper }}_ROOT="{{ env.install.datapath }}/{{ env.name | lower }}"
+export {{ env.name | upper }}_ROOT="{{ env.install.datapath }}"
 eval "$({{ env.name | lower }} init -)"
 
 {% if env.shell.post_init_hook is defined and env.shell.post_init_hook -%}

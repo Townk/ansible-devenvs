@@ -22,17 +22,17 @@
 ---
 - name: "Check for {{ env.type }} version {{ version }} on {{ env.name }}"
   stat:
-    path: "{{ env.install.datapath }}/{{ env.name | lower }}/versions/{{ version }}"
+    path: "{{ env.install.datapath }}/versions/{{ version }}"
   register: env_version
   ignore_errors: yes
   when: not env.install.force
 
 - name: "Install {{ env.type }} version {{ version }} on {{ env.name }}"
-  raw: "SDKROOT=${SDKROOT:-{{ macOS_SDK_ROOT if macOS_SDK_ROOT is defined else '' }} } {{ env.name | upper }}_ROOT='{{ env.install.datapath }}/{{ env.name | lower }}' {{ _env.cmd }} install {{ version }}"
+  raw: "SDKROOT=${SDKROOT:-{{ macOS_SDK_ROOT if macOS_SDK_ROOT is defined else '' }} } {{ env.name | upper }}_ROOT='{{ env.install.datapath }}' {{ _env.cmd }} install {{ version }}"
   notify: Rehash installed versions
   when: env_version is not defined or not env_version.stat.exists
 
 - name: "Install {{ env.type }} version {{ version }} on {{ env.name }}"
-  raw: "SDKROOT=${SDKROOT:-{{ macOS_SDK_ROOT if macOS_SDK_ROOT is defined else '' }} } {{ env.name | upper }}_ROOT='{{ env.install.datapath }}/{{ env.name | lower }}' {{ _env.cmd }} install {{ version }} --force"
+  raw: "SDKROOT=${SDKROOT:-{{ macOS_SDK_ROOT if macOS_SDK_ROOT is defined else '' }} } {{ env.name | upper }}_ROOT='{{ env.install.datapath }}' {{ _env.cmd }} install {{ version }} --force"
   notify: Rehash installed versions
   when: env.install.force and env_version.stat.exists

@@ -38,7 +38,7 @@
   block:
     - name: "Find all versions of {{ env.type }} that are not needed anymore"
       find:
-        paths: "{{ env.install.datapath }}/{{ env.name | lower }}/versions"
+        paths: "{{ env.install.datapath }}/versions"
         follow: yes
         file_type: directory
       register: _env_to_remove
@@ -67,7 +67,7 @@
   block:
     - name: "Get a list of installed {{ env.type }} versions"
       find:
-        paths: "{{ env.install.datapath }}/{{ env.name | lower }}/versions"
+        paths: "{{ env.install.datapath }}/versions"
         follow:
         file_type: link
       register: _env_installed_versions
@@ -135,7 +135,7 @@
     - name: "Define default {{ env.type }} packages to be installed on each {{ env.name }} version" 
       template:
         src: default-packages.j2
-        dest: "{{ env.install.datapath }}/{{ env.name | lower }}/default-packages"
+        dest: "{{ env.install.datapath }}/default-packages"
 
     - name: "Update default packages on existent {{ env.name }} versions"      
       include_tasks: update-default-pkgs.yaml
@@ -153,5 +153,5 @@
   ignore_errors: true
 
 - name: "Set the default version of {{ env.type }} to {{ env.default_version }} on {{ env.name }}"
-  raw: "{{ env.name | upper }}_ROOT='{{ env.install.datapath }}/{{ env.name | lower }}' {{ env.install.path }}/bin/{{ env.name | lower }} global {{ env.default_version }}"
+  raw: "{{ env.name | upper }}_ROOT='{{ env.install.datapath }}' {{ env.install.path }}/bin/{{ env.name | lower }} global {{ env.default_version }}"
   when: env.default_version is defined and (_env_current_version.rc != 0 or _env_current_version.stdout.split()|first != env.default_version)

@@ -22,26 +22,26 @@
 ---
 # - name: "Check for previous installation of {{ plugin.name }} plugin"
 #   stat:
-#     path: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins/{{ plugin.name }}"
+#     path: "{{ env.install.datapath }}/plugins/{{ plugin.name }}"
 #   ignore_errors: true
 #   register: plugin_path
 
 - name: "Install latest version of {{ plugin.name }} plugin"
   git:
     repo: "https://github.com/{{ plugin.repo }}.git"
-    dest: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins/{{ plugin.name }}"
+    dest: "{{ env.install.datapath }}/plugins/{{ plugin.name }}"
   when: plugin.repo is defined #and not plugin_path.stat.exists
 
 - name: Install bundled plugin
   block:
-    - name: "Create plugins directory at {{ env.install.datapath }}/{{ env.name | lower }}"
+    - name: "Create plugins directory at {{ env.install.datapath }}"
       file:
-        path: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins"
+        path: "{{ env.install.datapath }}/plugins"
         state: directory
 
     - name: "Install bundled version of {{ plugin.name }} plugin"
       copy:
         src: "{{ _env.tmpdir }}/{{ plugin.file }}"
-        dest: "{{ env.install.datapath }}/{{ env.name | lower }}/plugins/"
+        dest: "{{ env.install.datapath }}/plugins/"
         remote_src: yes
   when: plugin.file is defined #and not plugin_path.stat.exists

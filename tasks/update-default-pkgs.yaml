@@ -24,7 +24,7 @@
   block:
     - name: "Find `site-package` directory for {{ env.type }} {{ version }}"
       find:
-        paths: "{{ env.install.datapath }}/{{ env.name | lower }}/versions/{{ version }}/lib"
+        paths: "{{ env.install.datapath }}/versions/{{ version }}/lib"
         patterns: site-packages
         recurse: yes
         depth: 2
@@ -34,7 +34,7 @@
     - name: "Update default packages for {{ env.type }} {{ version }}"
       shell: |
         export PYTHONPATH="{{ _env_site_packages.files|map(attribute="path")|list|first }}"
-        {{ env.install.datapath }}/{{ env.name | lower }}/versions/{{ version }}/bin/pip install -U {{ item }}
+        {{ env.install.datapath }}/versions/{{ version }}/bin/pip install -U {{ item }}
       register: _pip_install_result
       changed_when: "'already up-to-date: '+item not in _pip_install_result.stdout"
       loop: "{{ env.default_packages }}"
@@ -46,7 +46,7 @@
   block:
     - name: "Update default packages for {{ env.type }} {{ version }}"
       yarn:
-        executable: "{{ env.install.datapath }}/{{ env.name | lower }}/versions/{{ version }}/bin/yarn"
+        executable: "{{ env.install.datapath }}/versions/{{ version }}/bin/yarn"
         name: "{{ item }}"
         global: yes
         state: latest
